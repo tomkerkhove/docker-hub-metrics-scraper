@@ -19,7 +19,7 @@ namespace DockerHub.Metrics.Integration
         public DockerHubClient(HttpClient httpClient, ILogger<DockerHubClient> logger)
         {
             Guard.NotNull(httpClient, nameof(httpClient));
-            Guard.NotNull(httpClient, nameof(httpClient));
+            Guard.NotNull(logger, nameof(logger));
 
             _httpClient = httpClient;
             _logger = logger;
