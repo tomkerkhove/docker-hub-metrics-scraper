@@ -1,0 +1,97 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "LogicApp.Name": {
+            "type": "String"
+        },
+        "Repo.Name": {
+            "type": "String"
+        },
+        "Image.Name": {
+            "type": "String"
+        },
+        "connections_servicebus_externalid": {
+            "defaultValue": "/subscriptions/0f9d7fea-99e8-4768-8672-06a28514f77e/resourceGroups/docker-hub-metrics/providers/Microsoft.Web/connections/servicebus",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('LogicApp.Name')]",
+            "location": "westeurope",
+            "properties": {
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        },
+                        "ImageName": {
+                            "defaultValue": "promitor-agent-scraper",
+                            "type": "String"
+                        },
+                        "RepoName": {
+                            "defaultValue": "tomkerkhove",
+                            "type": "String"
+                        }
+                    },
+                    "triggers": {
+                        "Recurrence": {
+                            "recurrence": {
+                                "frequency": "Minute",
+                                "interval": 15
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
+                    "actions": {
+                        "Send_scrape_metrics_request_message": {
+                            "runAfter": {},
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "ContentData": "@{base64(concat('{','\n','\"RepoName\": \"',parameters('RepoName'),'\",','\n','  \"ImageName\": \"',parameters('ImageName'),'\"','\n','}'))}",
+                                    "ContentType": "application/json"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['servicebus']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/@{encodeURIComponent(encodeURIComponent('scrape-requests'))}/messages",
+                                "queries": {
+                                    "systemProperties": "None"
+                                }
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "servicebus": {
+                                "connectionId": "[parameters('connections_servicebus_externalid')]",
+                                "connectionName": "servicebus",
+                                "id": "/subscriptions/0f9d7fea-99e8-4768-8672-06a28514f77e/providers/Microsoft.Web/locations/westeurope/managedApis/servicebus"
+                            }
+                        }
+                    },
+                    "RepoName": {
+                        "value": "[parameters('Repo.Name')]"
+                    },
+                    "ImageName": {
+                        "value": "[parameters('Image.Name')]"
+                    }
+                }
+            }
+        }
+    ]
+}
