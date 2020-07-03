@@ -1,4 +1,5 @@
 ﻿using DockerHub.Metrics.Integration;
+using DockerHub.Metrics.Runtime.AzureFunction.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Azure.Functions.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
@@ -29,8 +30,12 @@ namespace DockerHub.Metrics.Runtime.AzureFunction
                 .WriteTo.Console()
                 .WriteTo.AzureApplicationInsights(instrumentationKey)
                 .CreateLogger();
-
-            builder.Services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog(logger));
+            
+            builder.Services.AddLogging(loggingBuilder =>
+            {
+                loggingBuilder.ClearProvidersExceptFunctionProviders();
+                loggingBuilder.AddSerilog(logger);
+            });
         }
     }
 }
