@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using DockerHub.Metrics.Integration;
+using DockerHub.Metrics.Runtime.AzureFunction.Contracts;
 using GuardNet;
 using Microsoft.Azure.WebJobs;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace DockerHub.Metrics.Runtime.AzureFunction
@@ -12,35 +12,39 @@ namespace DockerHub.Metrics.Runtime.AzureFunction
     public class DockerHubMetricScraperFunction
     {
         private readonly DockerHubClient _dockerHubClient;
-        private readonly IConfiguration _configuration;
         private readonly ILogger<DockerHubMetricScraperFunction> _logger;
 
-        public DockerHubMetricScraperFunction(DockerHubClient dockerHubClient, IConfiguration configuration, ILogger<DockerHubMetricScraperFunction> logger)
+        public DockerHubMetricScraperFunction(DockerHubClient dockerHubClient, ILogger<DockerHubMetricScraperFunction> logger)
         {
             Guard.NotNull(dockerHubClient, nameof(dockerHubClient));
-            Guard.NotNull(configuration, nameof(configuration));
             Guard.NotNull(logger, nameof(logger));
 
             _dockerHubClient = dockerHubClient;
-            _configuration = configuration;
             _logger = logger;
         }
 
         [FunctionName("docker-hub-metric-scraper")]
-        public async Task Run([TimerTrigger("0 */15 * * * *")] TimerInfo timer)
+        public async Task Run([ServiceBusTrigger("scrape-requests", Connection = "ServiceBusConnectionString")] ScrapeRequestMessage scrapeRequest)
         {
-            _logger.LogInformation($"Starting to scrape Docker Hub metrics at {DateTime.UtcNow}");
+            if (string.IsNullOrWhiteSpace(scrapeRequest.RepoName))
+            {
+                throw new ArgumentException("No repo name was provided");
+            }
+            if (string.IsNullOrWhiteSpace(scrapeRequest.ImageName))
+            {
+                throw new ArgumentException("No image name was provided");
+            }
 
-            var repoName = _configuration["DOCKER_HUB_REPO_NAME"];
-            var imageName = _configuration["DOCKER_HUB_IMAGE_NAME"];
-
-            var imageMetrics = await _dockerHubClient.GetImageMetricsAsync(repoName, imageName);
+            var imageId = $"{scrapeRequest.RepoName}/{scrapeRequest.ImageName}";
+            _logger.LogInformation($"Starting to scrape Docker Hub metrics at {DateTime.UtcNow} for {imageId}");
+            
+            var imageMetrics = await _dockerHubClient.GetImageMetricsAsync(scrapeRequest.RepoName, scrapeRequest.ImageName);
 
             var contextualInformation = new Dictionary<string, object>
             {
-                {"Repo Name", repoName},
-                {"Image Name", imageName},
-                {"Image ID", $"{repoName}/{imageName}"}
+                {"Repo Name", scrapeRequest.RepoName},
+                {"Image Name", scrapeRequest.ImageName},
+                {"Image ID", imageId}
             };
 
             _logger.LogMetric("Image Pulls", imageMetrics.Pulls, contextualInformation);

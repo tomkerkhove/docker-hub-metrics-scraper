@@ -1,8 +1,8 @@
 ﻿using DockerHub.Metrics.Integration;
-using DockerHub.Metrics.Runtime.AzureFunction.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Azure.Functions.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Configuration;
 using Serilog.Events;
