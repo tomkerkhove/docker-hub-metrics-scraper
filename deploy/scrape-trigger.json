@@ -2,34 +2,89 @@
     "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "LogicApp.Name": {
-            "type": "String"
-        },
         "Repo.Name": {
             "type": "String"
         },
         "Image.Name": {
             "type": "String"
         },
-        "connections_servicebus_externalid": {
-            "defaultValue": "/subscriptions/0f9d7fea-99e8-4768-8672-06a28514f77e/resourceGroups/docker-hub-metrics/providers/Microsoft.Web/connections/servicebus",
+        "LogicApp.Name": {
+            "type": "String"
+        },
+        "ServiceBus.Namespace.Name": {
+            "type": "String"
+        },
+        "ServiceBus.Connection.Name": {
             "type": "String"
         }
     },
-    "variables": {},
+    "variables": {
+        "Connection.Apis.ServiceBus.Id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/servicebus')]",
+        "ServiceBus.Queue.Name": "scrape-requests"
+    },
     "resources": [
+        {
+            "type": "Microsoft.ServiceBus/namespaces",
+            "apiVersion": "2017-04-01",
+            "name": "[parameters('ServiceBus.Namespace.Name')]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Standard"
+            },
+            "resources": [
+                {
+                    "type": "Queues",
+                    "apiVersion": "2017-04-01",
+                    "name": "[variables('ServiceBus.Queue.Name')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.ServiceBus/namespaces/', parameters('ServiceBus.Namespace.Name'))]"
+                    ],
+                    "tags": {
+                        "App": "Docker Hub Metric Scraper"
+                    }
+                }
+            ],
+            "tags": {
+                "App": "Docker Hub Metric Scraper"
+            }
+        },
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[parameters('ServiceBus.Connection.Name')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "displayName": "[parameters('ServiceBus.Connection.Name')]",
+                "customParameterValues": {
+                },
+                "api": {
+                    "id": "[variables('Connection.Apis.ServiceBus.Id')]"
+                },
+                "parameterValues": {
+                    "connectionString": "[listkeys(resourceId('Microsoft.ServiceBus/namespaces/authorizationRules', parameters('ServiceBus.Namespace.Name'), 'RootManageSharedAccessKey'), '2017-04-01').primaryConnectionString]"
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.ServiceBus/namespaces/queues', parameters('ServiceBus.Namespace.Name'), variables('ServiceBus.Queue.Name'))]"
+            ],
+            "tags": {
+                "App": "Docker Hub Metric Scraper"
+            }
+        },
         {
             "type": "Microsoft.Logic/workflows",
             "apiVersion": "2017-07-01",
             "name": "[parameters('LogicApp.Name')]",
-            "location": "westeurope",
+            "location": "[resourceGroup().location]",
             "properties": {
+                "state": "Disabled",
                 "definition": {
                     "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
                     "contentVersion": "1.0.0.0",
                     "parameters": {
                         "$connections": {
-                            "defaultValue": {},
+                            "defaultValue": {
+                            },
                             "type": "Object"
                         },
                         "ImageName": {
@@ -45,14 +100,15 @@
                         "Recurrence": {
                             "recurrence": {
                                 "frequency": "Minute",
-                                "interval": 15
+                                "interval": 5
                             },
                             "type": "Recurrence"
                         }
                     },
                     "actions": {
                         "Send_scrape_metrics_request_message": {
-                            "runAfter": {},
+                            "runAfter": {
+                            },
                             "type": "ApiConnection",
                             "inputs": {
                                 "body": {
@@ -72,15 +128,16 @@
                             }
                         }
                     },
-                    "outputs": {}
+                    "outputs": {
+                    }
                 },
                 "parameters": {
                     "$connections": {
                         "value": {
                             "servicebus": {
-                                "connectionId": "[parameters('connections_servicebus_externalid')]",
-                                "connectionName": "servicebus",
-                                "id": "/subscriptions/0f9d7fea-99e8-4768-8672-06a28514f77e/providers/Microsoft.Web/locations/westeurope/managedApis/servicebus"
+                                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('ServiceBus.Connection.Name'))]",
+                                "connectionName": "[parameters('ServiceBus.Connection.Name')]",
+                                "id": "[variables('Connection.Apis.ServiceBus.Id')]"
                             }
                         }
                     },
@@ -91,6 +148,12 @@
                         "value": "[parameters('Image.Name')]"
                     }
                 }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', parameters('ServiceBus.Connection.Name'))]"
+            ],
+            "tags": {
+                "App": "Docker Hub Metric Scraper"
             }
         }
     ]
