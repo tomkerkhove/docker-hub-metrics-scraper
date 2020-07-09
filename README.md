@@ -1,16 +1,18 @@
 # Docker Hub Metrics Scraper
-A scraper for Docker Hub metrics making the data available for analysis in Azure Application Insights.
-
-## How it works
-
-An Azure Function will scrape Docker Hub API for every scrape request on a Service Bus queue and report the following metrics in Azure Application Insights:
+A scraper for Docker Hub metrics making the data available for analysis by reporting the following metrics in Azure Application Insights:
 
 - `Image Pulls` - Amount of pulls for the image, regardless of the tag
 - `Image Stars` - Amount of stars for the image
 
-We provide an Azure Logic App which you can deploy per repo and image to schedule scrapes and report them as multi-dimensional metrics.
-
 ![Result in Application Insights](./media/result.png)
+
+## How it works
+
+An Azure Function will scrape Docker Hub API for every scrape request on a Service Bus queue and report the following metrics in Azure Application Insights.
+
+![How it works](./media/how-it-works.png)
+
+We provide an Azure Logic App which you can deploy per repo and image to schedule scrapes and report them as multi-dimensional metrics.
 
 ## Deploying a scrape trigger
 
